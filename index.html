@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BUKHARIYA EDUCATIONAL CENTRE - Stock Details</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<style>
+body{
+  font-family:'Poppins',sans-serif;
+  background:#eef2f7;
+  margin:0;
+  padding:20px;
+}
+.container{
+  max-width:900px;
+  margin:auto;
+}
+.header{
+  text-align:center;
+}
+.header h1{margin:0;font-size:28px;color:#0b3c5d;}
+.header h2{margin:4px 0;color:#444;}
+.header .time{font-size:14px;color:#666;}
+
+.search-box{
+  display:flex;
+  gap:10px;
+  margin:20px 0;
+}
+.search-box input{
+  flex:1;
+  padding:12px;
+  font-size:16px;
+}
+.search-box button{
+  padding:12px 18px;
+  background:#0b5ed7;
+  color:#fff;
+  border:none;
+  font-size:16px;
+  border-radius:6px;
+}
+
+.card{
+  background:#fff;
+  border-radius:12px;
+  padding:18px;
+  box-shadow:0 8px 20px rgba(0,0,0,.1);
+  margin-top:20px;
+}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  gap:14px;
+}
+.item{
+  background:#f7f9fc;
+  padding:10px;
+  border-radius:8px;
+  font-size:14px;
+}
+.item strong{display:block;color:#222;}
+.low{background:#fff0f0;color:#c62828}
+.actions{
+  margin-top:20px;
+  display:flex;
+  gap:10px;
+}
+.actions button{
+  flex:1;
+  padding:12px;
+  border:none;
+  border-radius:6px;
+  font-size:16px;
+  cursor:pointer;
+}
+.pdf{background:#2e7d32;color:#fff;}
+.new{background:#6c757d;color:#fff;}
+@media(max-width:600px){
+  .header h1{font-size:22px;}
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1>BUKHARIYA EDUCATIONAL CENTRE</h1>
+    <h2>Burhan Stationery</h2>
+    <div class="time" id="time"></div>
+  </div>
+
+  <div class="search-box">
+    <input id="code" placeholder="Enter Item Code (Eg: F1)">
+    <button onclick="searchItem()">Search</button>
+  </div>
+
+  <div id="result"></div>
+</div>
+
+<script>
+const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQqCfLpp-CK_qZ0rlDKT0SbUTL--j24S-S4bCTK33aCJDmkH1YVgoll_g8INDHJO0YOBvgcpaWsMcY_/pub?output=tsv";
+
+function updateTime(){
+  document.getElementById("time").innerText =
+    new Date().toLocaleString();
+}
+setInterval(updateTime,1000);
+
+async function searchItem(){
+  const code = document.getElementById("code").value.trim().toUpperCase();
+  if(!code){ alert("Enter Item Code"); return; }
+
+  document.getElementById("result").innerHTML="Loading...";
+
+  try {
+    const res = await fetch(SHEET_URL);
+    const text = await res.text();
+    const rows = text.split(/\r?\n/).map(r => r.split("\t").map(c => c.trim()));
+
+    // Header lookup
+    const header = rows[0].map(h => h.trim());
+
+    const idx = {
+      code: header.indexOf("Item Code"),
+      name: header.indexOf("Item Name"),
+      category: header.indexOf("Category"),
+      unit: header.indexOf("Unit"),
+      opening: header.indexOf("Opening Stock"),
+      stockIn: header.indexOf("Total Stock In"),
+      stockOut: header.indexOf("Total Stock Out"),
+      current: header.indexOf("Current Stock"),
+      purchase: header.indexOf("Purchase Price"),
+      selling: header.indexOf("Selling Price"),
+      value: header.indexOf("Total Stock Value"),
+      reorder: header.indexOf("Reorder Level"),
+      status: header.indexOf("Status")
+    };
+
+    const data = rows.slice(1);
+    const row = data.find(r => r[idx.code]?.toUpperCase() === code);
+
+    if(!row){
+      alert("Item Code not found");
+      document.getElementById("result").innerHTML="";
+      return;
+    }
+
+    let html = `<div class="card" id="pdfArea"><div class="grid">`;
+
+    const fields = [
+      ["Item Code", idx.code],
+      ["Item Name", idx.name],
+      ["Category", idx.category],
+      ["Unit", idx.unit],
+      ["Opening Stock", idx.opening],
+      ["Total Stock In", idx.stockIn],
+      ["Total Stock Out", idx.stockOut],
+      ["Current Stock", idx.current],
+      ["Purchase Price", idx.purchase],
+      ["Selling Price", idx.selling],
+      ["Total Stock Value", idx.value],
+      ["Reorder Level", idx.reorder],
+      ["Status", idx.status]
+    ];
+
+    fields.forEach(f => {
+      const label = f[0];
+      const value = row[f[1]] || "";
+      const cls = (label==="Status" && /LOW\s*STOCK/i.test(value)) ? "item low":"item";
+      html += `<div class="${cls}"><strong>${label}</strong>${value}</div>`;
+    });
+
+    html += `</div>
+      <div class="actions">
+        <button class="pdf" onclick="downloadPDF()">Download PDF</button>
+        <button class="new" onclick="location.reload()">New Search</button>
+      </div>
+    </div>`;
+
+    document.getElementById("result").innerHTML = html;
+
+  } catch(e){
+    document.getElementById("result").innerHTML = "<span style='color:red;'>Failed to load sheet data</span>";
+  }
+}
+
+function downloadPDF(){
+  html2pdf().from(document.getElementById("pdfArea")).save("Stock_Details.pdf");
+}
+</script>
+
+</body>
+</html>
